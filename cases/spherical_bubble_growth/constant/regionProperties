@@ -1,0 +1,28 @@
+//  =========                 |  -*- OpenFOAM -*-
+//  \\      /  F ield         |
+//   \\    /   O peration     |
+//    \\  /    A nd           |
+//     \\/     M anipulation  |
+//
+// Copyright (C) 2023 jakub
+//
+// Author: jakub <jakub@G9>
+
+/// Code:
+
+FoamFile
+{
+    version 2.0;
+    format ascii;
+    class dictionary;
+    object regionProperties;
+    location "constant";
+}
+
+regions
+(
+ fluid (fluid)
+ solid ()
+);
+
+/// regionProperties ends here

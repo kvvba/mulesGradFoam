@@ -1,0 +1,4 @@
+implicitInterfaceDiffFlux/implicitInterfaceDiffFlux.C
+explicitInterfaceDiffFlux/explicitInterfaceDiffFlux.C
+
+LIB = $(FOAM_USER_LIBBIN)/libphaseChangejakub

@@ -1,0 +1,6 @@
+#!/bin/bash
+wclean
+cd interfaceProperties/
+wclean
+cd ../interfaceDiffFlux
+wclean

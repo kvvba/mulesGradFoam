@@ -1,0 +1,159 @@
+//  =========                 |  -*- OpenFOAM -*-
+//  \\      /  F ield         |
+//   \\    /   O peration     |
+//    \\  /    A nd           |
+//     \\/     M anipulation  |
+//
+// Copyright (C) 2023 jakub
+//
+// Author: jakub <jakub@G9>
+
+/// Code:
+
+FoamFile
+{
+    version 2.0;
+    format ascii;
+    class dictionary;
+    object setExprFieldsDict;
+    location "system";
+}
+
+defaultFieldValues
+(
+ volScalarFieldValue alpha.water 0
+ volScalarFieldValue T 0
+);
+
+expressions
+(
+ 
+ outsideBubbleT
+ {
+     field TL;
+     dimensions [0 0 0 1 0 0 0];
+     constants
+     {
+         bubbleRadius 9.69812679359357e-05;
+         n #eval{(1/1) * 96.98};
+         // n 193.96;
+
+         c1 5.0;
+         c2 261332.30671579743; // using real water properties
+         // c2 184789.84622186306; // 2 * kappaL, sqrt(2) * rhov
+         // c2 369579.6924437261; // 0.5 * kappaL, sqrt(0.5) * rhov
+         
+         a1 0.254829592;
+         a2 -0.284496736;
+         a3 1.421413741;
+         a4 -1.453152027;
+         a5 1.061405429;
+     }
+     variables
+     (
+      // "dx = 2.5 * ${constants.bubbleRadius}/${constants.n}"
+      "dx = 15.0e-6"
+      "xi = mag(pos() - vector(dx, dx, dx)) - ${constants.bubbleRadius}"
+      // "xi = mag(pos()) - ${constants.bubbleRadius}"
+      "z = xi*${constants.c2}"
+      "T = 1/(1 + 0.3275911*z)"
+      "erfz = 1 - (${constants.a1}*T + ${constants.a2}*pow(T,2.0) + ${constants.a3}*pow(T,3.0) + ${constants.a4}*pow(T,4.0) + ${constants.a5}*pow(T,5.0))*exp(-pow(z,2.0))"
+      // https://www.statisticshowto.com/error-function/
+     );
+     fieldMask
+     #{
+         xi >= 0.0
+     #};
+     expression
+     #{
+         378.15 - ${constants.c1}*(1-erfz)
+     #};
+ }
+
+ initiala1
+ {
+     field alpha.water;
+     dimensions [0 0 0 0 0 0 0];
+     constants
+     {
+         rbub 9.69812679359357e-05;
+         l 9.69812679359357e-05;
+         n #eval{(1/1) * 96.98};
+         // n 193.96;
+     }
+     variables
+     (
+      // "dx = ${constants.l} / ${constants.n}"
+      "dx = 15.0e-6"
+      "dd = - mag(pos()) + ${constants.rbub}"
+      "eps = 1.5 * dx"
+     );
+     fieldMask
+     #{
+         dd < -eps
+     #};
+     expression
+     #{
+         1.0
+     #};
+ }
+
+ initialfa2
+ {
+     field alpha.water;
+     dimensions [0 0 0 0 0 0 0];
+     constants
+     {
+         rbub 9.69812679359357e-05;
+         l 9.69812679359357e-05;
+         n #eval{(1/1) * 96.98};
+         // n 193.96;
+         pi #eval{pi()};
+     }
+     variables
+     (
+      // "dx = ${constants.l} / ${constants.n}"
+      "dx = 15.0e-6"
+      "dd = - mag(pos()) + ${constants.rbub}"
+      "eps = 1.5 * dx"
+      "aexpr=0.5-dd/(2.0*eps)-1.0/(2.0*${constants.pi})*sin(${constants.pi}*dd/eps)"
+     );
+     fieldMask
+     #{
+         (dd >= -eps) && (dd < eps)
+     #};
+     expression
+     #{
+         aexpr
+     #};
+ }
+ initalfa3
+ {
+     field alpha.water;
+     dimensions [0 0 0 0 0 0 0];
+     constants
+     {
+         rbub 9.69812679359357e-05;
+         l 9.69812679359357e-05;
+         n #eval{(1/1) * 96.98};
+         // n 193.96;
+     }
+     variables
+     (
+      // "dx = ${constants.l} / ${constants.n}"
+      "dx = 15.0e-6"
+      "dd = - mag(pos()) + ${constants.rbub}"
+      "eps = 1.5 * dx"
+     );
+     fieldMask
+     #{
+         dd >= eps
+     #};
+     expression
+     #{
+         0.0
+     #};
+ }
+);
+
+/// setExprFieldsDict ends here

@@ -1,0 +1,7 @@
+#!/bin/bash
+cd interfaceProperties/
+wmake
+cd ../interfaceDiffFlux
+wmake
+cd ..
+wmake

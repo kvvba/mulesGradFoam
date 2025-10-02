@@ -1,0 +1,51 @@
+/*---------------------------------------------------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     |
+    \\  /    A nd           | www.openfoam.com
+     \\/     M anipulation  |
+-------------------------------------------------------------------------------
+    Copyright (C) 2011-2016 OpenFOAM Foundation
+    Copyright (C) 2017 OpenCFD Ltd.
+		Copyright (C) 2023 Jakub Cranmer <jakub@posteo.net>
+-------------------------------------------------------------------------------
+License
+    This file is part of interMultiKFoam.
+
+    interMultiKFoam is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    interMultiKFoam is distributed in the hope that it will be useful, but WITHOUT
+    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+    FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+    for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with interMultiKFoam.  If not, see <http://www.gnu.org/licenses/>.
+
+\*---------------------------------------------------------------------------*/
+// Initialise solid field pointer lists
+PtrList<solidThermo> thermos(solidRegions.size());
+scalarField maxTSolid(solidRegions.size(),0.);
+PtrList<fv::options> solidHeatSources(solidRegions.size());
+
+// Populate solid field pointer lists
+forAll(solidRegions, i)
+{
+  Info<< "*** Reading solid mesh thermophysical properties for region "
+      << solidRegions[i].name() << nl << endl;
+
+  Info<< "    Adding to thermos\n" << endl;
+  thermos.set(i, solidThermo::New(solidRegions[i]));
+
+  maxTSolid[i] = gMax(thermos[i].T());
+
+	Info<< "    Adding fvOptions\n" << endl;
+	solidHeatSources.set
+		(
+		 i,
+		 new fv::options(solidRegions[i])
+		 );
+}

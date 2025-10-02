@@ -1,0 +1,45 @@
+//  =========                 |  -*- OpenFOAM -*-
+//  \\      /  F ield         |
+//   \\    /   O peration     |
+//    \\  /    A nd           |
+//     \\/     M anipulation  |
+//
+// Copyright (C) 2023 jakub
+//
+// Author: jakub <jakub@g9>
+
+/// Code:
+
+FoamFile
+{
+    version 2.0;
+    format ascii;
+    class dictionary;
+    object changeDictionaryDict;
+}
+
+boundary
+{
+    front
+    {
+        type wedge;
+    }
+    back
+    {
+        type wedge;
+    }
+    edge
+    {
+        type patch;
+    }
+    bottom
+    {
+        type symmetry;
+    }
+    axis
+    {
+        type symmetry;
+    }
+}
+
+/// changeDictionaryDict ends here
