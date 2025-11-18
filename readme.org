@@ -1,6 +1,11 @@
 * Info
 Multi-region interfoam modified with a gradient-based phase change model.
 
+* Test cases
+The repository contains the following test cases:
+- Growth of an isolated spherical bubble in uniformly superheated liquid.
+- Growth of a bubble on a wall under subcooled flow boiling conditions (MAITY, S. 2000. Effect of velocity and gravity on bubble dynamics. University of California, Los Angeles).
+
 * Adapting from interMultiKFoam
 Copy T file to TL and TV, rename objects within the files but the other contents remain the same.
 
