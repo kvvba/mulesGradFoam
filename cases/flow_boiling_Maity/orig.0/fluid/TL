@@ -1,0 +1,89 @@
+//  =========                 |  -*- OpenFOAM -*-
+//  \\      /  F ield         |
+//   \\    /   O peration     |
+//    \\  /    A nd           |
+//     \\/     M anipulation  |
+//
+// Copyright (C) 2023 Jakub Cranmer
+//
+// Author: Jakub Cranmer <jakub@MacBook-Air-Jakub.local>
+
+/// Code:
+
+FoamFile
+{
+    version 2.0;
+    format ascii;
+    class volScalarField;
+    object TL;
+}
+
+dimensions [0 0 0 1 0 0 0];
+
+internalField uniform 373.15;
+
+boundaryField
+{
+    inlet
+    {
+        type codedFixedValue;
+        value uniform #eval{373.15 - 0.2};
+        name temperatureProfile;
+        code
+        #{
+            const vectorField& Cf = patch().Cf();
+            scalarField& field = *this;
+            const scalar Tw = 5.3;
+            const scalar Tsub = 0.2;
+            const scalar freeU = 0.076;
+            const scalar nu = 2.922e-7;
+            const scalar x = 0.03792460276410395;
+            const scalar kappa = 0.679;
+            const scalar cp = 4216.0;
+            const scalar rho = 958.4;
+
+            const scalar prandtl = nu/(kappa/(cp * rho));
+            const scalar boundary = 4.64*sqrt((x * nu)/freeU);
+            const scalar boundaryT = boundary / (1.026 * pow(prandtl, 1.0/3.0));
+            // const scalar boundaryT =  0.002817697775654847;
+
+            forAll(Cf, facei)
+            {
+                scalar y = Cf[facei].y();
+                scalar temperature = (Tw + Tsub) * (1 - 1.5*(y/boundaryT) + 0.5 * pow(y/boundaryT, 3)) + (373.15 - Tsub);
+                if (y <= boundaryT)
+                {
+                    field[facei] = temperature;
+                }
+                else
+                {
+                    field[facei] = 373.15 - Tsub;
+                }
+            }
+        #};
+    }
+    outlet
+    {
+        type zeroGradient;
+    }
+    top
+    {
+        type zeroGradient;
+    }
+    silicon
+    {
+        type fixedValue;
+        value uniform #eval{373.15 + 5.3};
+    }
+    front
+    {
+        type symmetryPlane;
+    }
+    back
+    {
+        type zeroGradient;
+    }
+}
+
+
+/// T ends here

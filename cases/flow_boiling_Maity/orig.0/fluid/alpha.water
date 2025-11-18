@@ -1,0 +1,56 @@
+//  =========                 |  -*- OpenFOAM -*-
+//  \\      /  F ield         |
+//   \\    /   O peration     |
+//    \\  /    A nd           |
+//     \\/     M anipulation  |
+//
+// Copyright (C) 2023 Jakub Cranmer
+//
+// Author: Jakub Cranmer <jakub@MacBook-Air-Jakub.local>
+
+/// Code:
+
+FoamFile
+{
+    version 2.0;
+    format ascii;
+    class volScalarField;
+    object alpha.water;
+}
+
+dimensions [0 0 0 0 0 0 0];
+
+internalField uniform 1;
+
+boundaryField
+{
+    inlet
+    {
+        type zeroGradient;
+    }
+    outlet
+    {
+        type zeroGradient;
+    }
+    top
+    {
+        type zeroGradient;
+    }
+    silicon
+    {
+        type constantAlphaContactAngle;
+        theta0 28.0;
+        limit gradient;
+        value uniform 0.0;
+    }
+    front
+    {
+        type symmetryPlane;
+    }
+    back
+    {
+        type zeroGradient;
+    }
+}
+
+/// alpha.water ends here

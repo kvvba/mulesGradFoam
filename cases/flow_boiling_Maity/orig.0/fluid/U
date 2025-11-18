@@ -1,0 +1,93 @@
+//  =========                 |  -*- OpenFOAM -*-
+//  \\      /  F ield         |
+//   \\    /   O peration     |
+//    \\  /    A nd           |
+//     \\/     M anipulation  |
+//
+// Copyright (C) 2023 Jakub Cranmer
+//
+// Author: Jakub Cranmer <jakub@MacBook-Air-Jakub.local>
+
+/// Code:
+
+FoamFile
+{
+    version 2.0;
+    format ascii;
+    class volVectorField;
+    object U;
+}
+
+dimensions [0 1 -1 0 0 0 0];
+
+internalField uniform (0 0 0);
+
+boundaryField
+{
+    inlet
+    {
+        type codedFixedValue;
+        value uniform (0 0 0);
+        name Uprofile;
+        code
+        #{
+            const vectorField& Cf = patch().Cf();
+            vectorField& field = *this;
+            const scalar freeU = 0.076;
+            const scalar nu = 2.922e-7;
+            const scalar x = 0.03792460276410395;
+            scalar boundary = 4.64 * sqrt((x * nu)/freeU);
+
+            forAll(Cf, facei)
+            {
+                scalar y = Cf[facei].y();
+                // scalar velocity = freeU * (y/boundary) * (2 - (y/boundary));
+                scalar velocity = freeU * Foam::pow(y/boundary, (1.0/7.0));
+
+                // if (y <= boundary && y > 0.0)
+                if (y <= boundary)
+                {
+                    field[facei] = vector(velocity, 0.0, 0.0);
+                }
+                else if (y > boundary)
+                {
+                    field[facei] = vector(freeU, 0.0, 0.0);
+                }
+                // else if (y <= 0.0)
+                // {
+                //     field[facei] = vector(0.0, 0.0, 0.0);
+                // }
+            }
+        #};
+    }
+    outlet
+    {
+        type pressureInletOutletVelocity;
+        value uniform (0 0 0);
+    }
+    top
+    {
+        type pressureInletOutletVelocity;
+        value uniform (0 0 0);
+        // type slip;
+        // type fixedValue;
+        // value uniform (0.076 0.0 0.0);
+    }
+    silicon
+    {
+        type noSlip;
+    }
+    front
+    {
+        type symmetryPlane;
+    }
+    back
+    {
+        type pressureInletOutletVelocity;
+        value uniform (0 0 0);
+        // type slip;
+    }
+}
+
+
+/// U ends here

@@ -1,0 +1,193 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  1.6                                   |
+|   \\  /    A nd           | Web:      http://www.OpenFOAM.org               |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      blockMeshDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+
+scale 1;
+
+refineLD 3.0e-3;								// downstream
+refineLU 0.5e-3;								// upstream
+refineH 3e-3;
+refineW -1.5e-3;
+
+inlet -1.5e-3;
+outlet 4.0e-3;
+height 6.0e-3;
+width -3.0e-3;
+
+vertices
+(
+ // layer 1
+ ($inlet 0.0 0.0)								// 0
+ (-$refineLU 0.0 0.0)						// 1
+ ($refineLD 0.0 0.0)							// 2
+ ($outlet 0.0 0.0)							// 3
+ 
+ ($inlet $refineH 0.0)					// 4
+ (-$refineLU $refineH 0.0)				// 5
+ ($refineLD $refineH 0.0)				// 6
+ ($outlet $refineH 0.0)					// 7
+
+ ($inlet $height 0.0)						// 8
+ (-$refineLU $height 0.0)				// 9
+ ($refineLD $height 0.0)					// 10
+ ($outlet $height 0.0)					// 11
+
+ // layer 2
+ ($inlet 0.0 $refineW)					// 12
+ (-$refineLU 0.0 $refineW)			  // 13
+ ($refineLD 0.0 $refineW)				// 14
+ ($outlet 0.0 $refineW)					// 15
+ 
+ ($inlet $refineH $refineW)			// 16
+ (-$refineLU $refineH $refineW)	// 17
+ ($refineLD $refineH $refineW)		// 18
+ ($outlet $refineH $refineW)		// 19
+
+ ($inlet $height $refineW)		  // 20
+ (-$refineLU $height $refineW)		// 21
+ ($refineLD $height $refineW)		// 22
+ ($outlet $height $refineW)			// 23
+
+ // layer 3
+ ($inlet 0.0 $width)						// 12
+ (-$refineLU 0.0 $width)					// 13
+ ($refineLD 0.0 $width)					// 14
+ ($outlet 0.0 $width)						// 15
+ 
+ ($inlet $refineH $width)				// 16
+ (-$refineLU $refineH $width)		// 17
+ ($refineLD $refineH $width)			// 18
+ ($outlet $refineH $width)			// 19
+
+ ($inlet $height $width)				// 20
+ (-$refineLU $height $width)			// 21
+ ($refineLD $height $width)			// 22
+ ($outlet $height $width)				// 23
+
+);
+
+refineCells 233;
+refineWCells 100;
+topCells 73;
+sideCells 23;
+widthCells 37;
+
+// refineCells 30;
+// refineWCells 15;
+// topCells 11;
+// sideCells 5;
+// widthCells 5;
+
+
+exp 6;
+invexp #eval{1/6};
+
+blocks
+(
+ // layers 1-2
+ hex (12 13 17 16 0 1 5 4) ($sideCells $refineCells $refineWCells) simpleGrading ($invexp 1 1)
+ hex (13 14 18 17 1 2 6 5) ($refineCells $refineCells $refineWCells) simpleGrading (1 1 1)
+ hex (14 15 19 18 2 3 7 6) ($sideCells $refineCells $refineWCells) simpleGrading ($exp 1 1)
+ hex (16 17 21 20 4 5 9 8) ($sideCells $topCells $refineWCells) simpleGrading ($invexp $exp 1)
+ hex (17 18 22 21 5 6 10 9) ($refineCells $topCells $refineWCells) simpleGrading (1 $exp 1)
+ hex (18 19 23 22 6 7 11 10) ($sideCells $topCells $refineWCells) simpleGrading ($exp $exp 1)
+
+ // layers 2-3
+ hex (24 25 29 28 12 13 17 16) ($sideCells $refineCells $widthCells) simpleGrading ($invexp 1 $invexp)
+ hex (25 26 30 29 13 14 18 17) ($refineCells $refineCells $widthCells) simpleGrading (1 1 $invexp)
+ hex (26 27 31 30 14 15 19 18) ($sideCells $refineCells $widthCells) simpleGrading ($exp 1 $invexp)
+ hex (28 29 33 32 16 17 21 20) ($sideCells $topCells $widthCells) simpleGrading ($invexp $exp $invexp)
+ hex (29 30 34 33 17 18 22 21) ($refineCells $topCells $widthCells) simpleGrading (1 $exp $invexp)
+ hex (30 31 35 34 18 19 23 22) ($sideCells $topCells $widthCells) simpleGrading ($exp $exp $invexp)
+);
+
+boundary
+(
+ front
+ {
+	   type symmetryPlane;
+     faces
+     (
+			(0 1 5 4)
+			(1 2 6 5)
+			(2 3 7 6)
+			(4 5 9 8)
+			(5 6 10 9)
+			(6 7 11 10)
+     );
+ }
+ inlet
+ {
+     type patch;
+     faces
+     (
+			(0 4 16 12)
+			(4 8 20 16)
+			(12 16 28 24)
+			(16 20 32 28)
+     );
+ }
+ outlet
+ {
+     type patch;
+     faces
+     (
+			(15 19 7 3)
+			(19 23 11 7)
+			(27 31 19 15)
+			(31 35 23 19)
+     );
+ }
+ back
+ {
+     type patch;
+     faces
+     (
+			(24 28 29 25)
+			(25 29 30 26)
+			(26 30 31 27)
+			(28 32 33 29)
+			(29 33 34 30)
+			(30 34 35 31)
+     );
+ }
+ silicon
+ {
+     type wall;
+     faces
+     (
+			(0 12 13 1)
+			(1 13 14 2)
+			(2 14 15 3)
+			(12 24 25 13)
+			(13 25 26 14)
+			(14 26 27 15)
+     );
+ }
+ top
+ {
+     type patch;
+     faces
+     (
+			(8 9 21 20)
+			(9 10 22 21)
+			(10 11 23 22)
+			(20 21 33 32)
+			(21 22 34 33)
+			(22 23 35 34)
+     );
+ }
+);

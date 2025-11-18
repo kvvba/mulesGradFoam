@@ -1,0 +1,91 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  1.7.0                                 |
+|   \\  /    A nd           | Web:      www.OpenFOAM.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      controlDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+
+application     mulesGradFoam;
+
+startFrom       latestTime;
+
+startTime       0.0;
+
+stopAt          endTime;
+
+endTime         40.0e-3;
+
+deltaT          1.0E-9;
+
+writeControl    runTime;
+writeInterval   2.5e-4;
+
+purgeWrite      0;
+
+writeFormat     binary;
+
+writePrecision  10;
+
+writeCompression off;
+
+timeFormat      general;
+
+timePrecision   10;
+
+runTimeModifiable yes;
+
+adjustTimeStep  yes;
+
+maxAlphaCo      0.1;
+maxCo           0.1;
+maxDeltaT       1e-5;
+maxCapillaryNum 1e8;
+
+
+functions
+{
+  bubbleVolume
+    {
+      libs (utilityFunctionObjects);
+      type coded;
+      name bubbleVolume;
+
+      active yes;
+      writeControl timeStep;
+      writeInterval 1;
+      region fluid;
+      codeWrite
+        #{
+        const volScalarField& alpha = mesh().lookupObject<volScalarField>("alpha.vapour");
+      scalar bubbleV(0);
+      bubbleV = fvc::domainIntegrate(alpha).value();
+
+      if( Pstream::master() == true )
+        {
+          std::ofstream fs;
+          fs.open ("volume.csv", std::ofstream::out | std::ofstream::app);
+          fs.precision(8);
+          fs << mesh().time().value() << "\t" << bubbleV << "\n" ;
+          fs.close();
+        }
+      #};
+
+      codeInclude
+        #{
+           #include <fstream>
+        #};
+    }
+
+}
+
+// ************************************************************************** //

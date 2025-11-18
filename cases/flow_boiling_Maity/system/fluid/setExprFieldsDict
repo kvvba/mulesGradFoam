@@ -1,0 +1,180 @@
+//  =========                 |  -*- OpenFOAM -*-
+//  \\      /  F ield         |
+//   \\    /   O peration     |
+//    \\  /    A nd           |
+//     \\/     M anipulation  |
+//
+// Copyright (C) 2023 Jakub Cranmer
+//
+// Author: Jakub Cranmer <jakub@MacBook-Air-Jakub.local>
+
+/// Code:
+
+FoamFile
+{
+    version 2.0;
+    format ascii;
+    class dictionary;
+    object setExprFieldsDict;
+}
+
+defaultFieldValues
+(
+ volScalarFieldValue alpha.water 1.0
+);
+
+expressions
+(
+ velocity
+ {
+     field U;
+     dimensions [0 1 -1 0 0 0 0];
+     constants
+     {
+         freeU 0.076;
+         nu 2.922e-7;
+         xPlate 0.03792460276410395;
+     }
+     variables
+     (
+      "y = pos().y()"
+      // "x = ${constants.xPlate} + pos().x()"
+      "x = ${constants.xPlate}"
+      "boundary = 4.64 * sqrt((x * ${constants.nu})/${constants.freeU})"
+      // "velocity = ${constants.freeU} * (y/boundary) * (2 - (y/boundary))"
+      "velocity = ${constants.freeU} * pow(y/boundary, (1.0/7.0))"
+     );
+     fieldMask
+     #{
+         y <= boundary
+     #};
+     expression
+     #{
+         vector(velocity, 0.0, 0.0)
+     #};
+ }
+ velocityFree
+ {
+     field U;
+     dimensions [0 1 -1 0 0 0 0];
+     constants
+     {
+         freeU 0.076;
+         nu 2.922e-7;
+         xPlate 0.03792460276410395;
+     }
+     variables
+     (
+      "y = pos().y()"
+      "x = ${constants.xPlate}"
+      // "x = ${constants.xPlate} + pos().x()"
+      "boundary = 4.64 * sqrt((x * ${constants.nu})/${constants.freeU})"
+     );
+     fieldMask
+     #{
+         y > boundary
+     #};
+     expression
+     #{
+         vector(${constants.freeU}, 0.0, 0.0)
+     #};
+ }
+ thermal
+ {
+     field TL;
+     dimensions [0 0 0 1 0 0 0];
+     constants
+     {
+         Tw 5.3;
+         Tsub 0.2;
+         freeU 0.076;
+         nu 2.922e-7;
+         xPlate 0.03792460276410395;
+         kappa 0.679;
+         cp 4216.0;
+         rho 958.4;
+     }
+     variables
+     (
+      "y = pos().y()"
+      // "x = ${constants.xPlate} + pos().x()"
+      "x = ${constants.xPlate}"
+      "boundary = 4.64 * sqrt((x * ${constants.nu})/${constants.freeU})"
+      // "prandtl = ${constants.nu}/(${constants.kappa}/(${constants.cp} * ${constants.rho}))"
+      "prandtl = ${constants.nu} * ${constants.rho} * ${constants.cp} / ${constants.kappa}"
+      "boundaryT = boundary / (1.026 * pow(prandtl, 1.0/3.0))"
+      "temperature = (${constants.Tw} + ${constants.Tsub}) * (1.0 - 1.5*(y/boundaryT) + 0.5 * pow(y/boundaryT, 3.0)) + (373.15 - ${constants.Tsub})"
+     );
+     fieldMask
+     #{
+         y <= boundaryT
+         // temperature > 373.15
+     #};
+     expression
+     #{
+         temperature
+     #};
+ }
+ thermalFree
+ {
+     field TL;
+     dimensions [0 0 0 1 0 0 0];
+     constants
+     {
+         Tsub 0.2;
+         freeU 0.076;
+         nu 2.922e-7;
+         xPlate 0.03792460276410395;
+         kappa 0.679;
+         cp 4216.0;
+         rho 958.4;
+     }
+     variables
+     (
+       "y = pos().y()"
+      // "x = ${constants.xPlate} + pos().x()"
+      "x = ${constants.xPlate}"
+      "boundary = 4.64 * sqrt((x * ${constants.nu})/${constants.freeU})"
+      "prandtl = ${constants.nu}/(${constants.kappa}/(${constants.cp} * ${constants.rho}))"
+      "boundaryT = boundary / (1.026 * pow(prandtl, 1.0/3.0))"
+     );
+     fieldMask
+     #{
+         y > boundaryT
+         // temperature <= 373.15
+     #};
+     expression
+     #{
+         373.15 - ${constants.Tsub}
+     #};
+ }
+ thermalBubble
+ {
+     field TL;
+     dimensions [0 0 0 1 0 0 0];
+     constants
+     {
+         rbub 0.125e-3;
+         theta 28.0;
+     }
+     variables
+     (
+      "dx = 15.0e-6"
+      "magdx = mag(vector(dx,dx,dx))"
+      "thetaR = degToRad(${constants.theta})"
+      "height = ${constants.rbub} * cos(thetaR)"
+      "position = mag(pos() - vector(0.0, height, 0.0))"
+     );
+
+     fieldMask
+     #{
+         position < ${constants.rbub} + magdx
+     #};
+     expression
+     #{
+         373.15
+     #};
+ }
+);
+
+/// setExprFieldsDict ends here
