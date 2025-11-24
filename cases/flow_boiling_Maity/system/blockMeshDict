@@ -80,17 +80,11 @@ vertices
 );
 
 refineCells 233;
+refineHCells 200;
 refineWCells 100;
 topCells 73;
 sideCells 23;
 widthCells 37;
-
-// refineCells 30;
-// refineWCells 15;
-// topCells 11;
-// sideCells 5;
-// widthCells 5;
-
 
 exp 6;
 invexp #eval{1/6};
@@ -98,17 +92,17 @@ invexp #eval{1/6};
 blocks
 (
  // layers 1-2
- hex (12 13 17 16 0 1 5 4) ($sideCells $refineCells $refineWCells) simpleGrading ($invexp 1 1)
- hex (13 14 18 17 1 2 6 5) ($refineCells $refineCells $refineWCells) simpleGrading (1 1 1)
- hex (14 15 19 18 2 3 7 6) ($sideCells $refineCells $refineWCells) simpleGrading ($exp 1 1)
+ hex (12 13 17 16 0 1 5 4) ($sideCells $refineHCells $refineWCells) simpleGrading ($invexp 1 1)
+ hex (13 14 18 17 1 2 6 5) ($refineCells $refineHCells $refineWCells) simpleGrading (1 1 1)
+ hex (14 15 19 18 2 3 7 6) ($sideCells $refineHCells $refineWCells) simpleGrading ($exp 1 1)
  hex (16 17 21 20 4 5 9 8) ($sideCells $topCells $refineWCells) simpleGrading ($invexp $exp 1)
  hex (17 18 22 21 5 6 10 9) ($refineCells $topCells $refineWCells) simpleGrading (1 $exp 1)
  hex (18 19 23 22 6 7 11 10) ($sideCells $topCells $refineWCells) simpleGrading ($exp $exp 1)
 
  // layers 2-3
- hex (24 25 29 28 12 13 17 16) ($sideCells $refineCells $widthCells) simpleGrading ($invexp 1 $invexp)
- hex (25 26 30 29 13 14 18 17) ($refineCells $refineCells $widthCells) simpleGrading (1 1 $invexp)
- hex (26 27 31 30 14 15 19 18) ($sideCells $refineCells $widthCells) simpleGrading ($exp 1 $invexp)
+ hex (24 25 29 28 12 13 17 16) ($sideCells $refineHCells $widthCells) simpleGrading ($invexp 1 $invexp)
+ hex (25 26 30 29 13 14 18 17) ($refineCells $refineHCells $widthCells) simpleGrading (1 1 $invexp)
+ hex (26 27 31 30 14 15 19 18) ($sideCells $refineHCells $widthCells) simpleGrading ($exp 1 $invexp)
  hex (28 29 33 32 16 17 21 20) ($sideCells $topCells $widthCells) simpleGrading ($invexp $exp $invexp)
  hex (29 30 34 33 17 18 22 21) ($refineCells $topCells $widthCells) simpleGrading (1 $exp $invexp)
  hex (30 31 35 34 18 19 23 22) ($sideCells $topCells $widthCells) simpleGrading ($exp $exp $invexp)
