@@ -22,7 +22,7 @@ t0 = R0^2 / B^2
 
 # Define functions
 
-z(deltaT, r) = 0.5*(3^0.5)*r/(alphaL * t0)^0.5
+z(r) = 0.5*(3^0.5)*r/(alphaL * t0)^0.5
 
 R_from_V(v) = ((3/4)*v/pi)^(1/3)   # calculates radius of bubble from wedge volume
 R(t) = B*(t^0.5)       # analytical radius
@@ -40,7 +40,7 @@ function T(R)
     if R < R0
         return Tsat
     else
-        return Tsat + dT*erf(z(dT, R0, R))
+        return Tsat + dT*erf(z(R-R0))
     end
 end
 

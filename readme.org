@@ -1,37 +1,8 @@
 * Info
-Multi-region interfoam modified with a gradient-based phase change model.
+A multi-region VOF solver with conjugate heat transfer and a gradient-based phase change model. Developed using OpenFOAM version 2212.
+Adapted from the standard OpenFOAM interFoam and chtMultiRegionFoam solvers, with the "implicit gradient" phase change model implemented by the [[https://github.com/DLR-RY/TwoPhaseFlow][TwoPhaseFlow project]].
 
 * Test cases
 The repository contains the following test cases:
 - Growth of an isolated spherical bubble in uniformly superheated liquid.
 - Growth of a bubble on a wall under subcooled flow boiling conditions (MAITY, S. 2000. Effect of velocity and gravity on bubble dynamics. University of California, Los Angeles).
-
-* Adapting from interMultiKFoam
-Copy T file to TL and TV, rename objects within the files but the other contents remain the same.
-
-Add into ~divSchemes~ inside ~fvSchemes~ the following:
-#+BEGIN_SRC cpp
-  div(rhoPhiCpL,TL)       Gauss SuperBee 1.0 phi;
-  div(rhoPhiCpV,TV)       Gauss SuperBee 1.0 phi;
-#+END_SRC
-
-Add into ~solvers~ in ~fvSolution~ the following:
-#+BEGIN_SRC cpp
-  "TV|TL"
-  {
-  	solver          PBiCGStab;
-  	preconditioner  DILU;
-  	tolerance       1e-10;
-  	relTol          0.0;
-  	minIter 5;
-  	maxIter 50;
-  }
-  "(TV|TL)Final"
-  {
-  	solver          PBiCGStab;
-  	preconditioner  DILU;
-  	tolerance       1e-08;
-  	relTol          0.0;
-  	maxIter 50;
-  }
-#+END_SRC
