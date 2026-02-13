@@ -5,4 +5,4 @@ interfaceDiffFlux/explicitInterfaceDiffFlux/explicitInterfaceDiffFlux.C
 mulesGradFoam.C
 
 
-EXE = $(FOAM_USER_APPBIN)/mulesGradFoam
+EXE = $(FOAM_USER_APPBIN)/mulesGradSeedingFoam

@@ -300,3 +300,141 @@ volScalarField SArea
  mesh,
  dimensionedScalar(dimless/dimLength, Zero)
  );
+// --- Bubble seeding: read optional `constant/bubbleSeeding` dictionary once
+//     and seed a spherical vapour region when the local temperature reaches
+//     `activationTemperature`.
+//
+// Dictionary (optional, place in `constant/bubbleSeeding`):
+// {
+//     activationTemperature 373.15;    // scalar
+//     coordinate (0.01 0.02 0.0);      // vector (contact point on surface)
+//     surfaceNormal (0 0 1);          // vector (points into fluid)
+//     contactAngle 60;                // degrees
+//     initialRadius 1e-3;             // meters
+//     seedOnce true;                  // optional (default true)
+// }
+static bool _bubbleSeedingInit = false;
+static bool _bubbleSeeded = false;
+static label _bubbleSeedCell = -1;
+static scalar _bubbleActivationT = GREAT; // very large default = disabled
+static vector _bubbleCoordinate = vector::zero;
+static vector _bubbleNormal = vector::zero;
+static scalar _bubbleContactAngleDeg = 90.0;
+static scalar _bubbleRadius = 0.0;
+static bool _bubbleSeedOnce = true;
+
+if (!_bubbleSeedingInit)
+{
+    _bubbleSeedingInit = true;
+
+    IOobject bsHeader
+    (
+        "bubbleSeeding",
+        runTime.constant(),
+        mesh,
+        IOobject::READ_IF_PRESENT,
+        IOobject::NO_WRITE
+    );
+
+    // Use IOobject header check for presence, then construct dictionary from file
+    if (bsHeader.typeHeaderOk<dictionary>(true))
+    {
+        dictionary bsDict(runTime.constant()/"bubbleSeeding");
+
+        _bubbleActivationT = bsDict.getOrDefault<scalar>("activationTemperature", GREAT);
+        _bubbleCoordinate = bsDict.getOrDefault<vector>("coordinate", vector::zero);
+        _bubbleNormal = bsDict.getOrDefault<vector>("surfaceNormal", vector(0,0,1));
+        _bubbleContactAngleDeg = bsDict.getOrDefault<scalar>("contactAngle", 90.0);
+        _bubbleRadius = bsDict.getOrDefault<scalar>("initialRadius", 0.0);
+        _bubbleSeedOnce = bsDict.getOrDefault<bool>("seedOnce", true);
+
+        if (_bubbleRadius > 0 && _bubbleActivationT < GREAT)
+        {
+            // find nearest cell to seed coordinate (cache index)
+            const pointField& Cc = mesh.C();
+            scalar bestDist2 = GREAT;
+            forAll(Cc, ci)
+            {
+                const scalar d2 = magSqr(Cc[ci] - _bubbleCoordinate);
+                if (d2 < bestDist2)
+                {
+                    bestDist2 = d2;
+                    _bubbleSeedCell = ci;
+                }
+            }
+
+            if (_bubbleSeedCell < 0)
+            {
+                Info<< "bubbleSeeding: could not find a mesh cell for coordinate "
+                    << _bubbleCoordinate << ", disabling seeding." << endl;
+                _bubbleActivationT = GREAT;
+            }
+            else
+            {
+                Info<< "bubbleSeeding: configured seed at cell " << _bubbleSeedCell
+                    << " (coord " << _bubbleCoordinate << ") with R=" << _bubbleRadius
+                    << " contactAngle=" << _bubbleContactAngleDeg << " deg" << endl;
+            }
+        }
+        else
+        {
+            Info<< "bubbleSeeding: dictionary present but incomplete (must provide activationTemperature and initialRadius). Ignoring." << endl;
+        }
+    }
+    else
+    {
+        // no bubbleSeeding dictionary — that's fine
+    }
+}
+
+// Check trigger each timestep (only if configured and not yet seeded or seedOnce==false)
+if (_bubbleActivationT < GREAT && (!_bubbleSeeded || !_bubbleSeedOnce))
+{
+    // sample temperature at the cached/nearest cell
+    if (_bubbleSeedCell >= 0)
+    {
+        scalar Tcell = T.internalField()[_bubbleSeedCell];
+
+        if (Tcell >= _bubbleActivationT)
+        {
+            Info << "bubbleSeeding: activation temperature reached (T=" << Tcell
+                 << ") — inserting bubble" << endl;
+
+            // vapour is always represented by alpha1 == 0 (user-specified)
+            // compute spherical centre so the interface meets the wall at the
+            // supplied contact angle: centre = contactPoint + n * (R * sin(theta))
+            scalar theta = _bubbleContactAngleDeg * Foam::acos(scalar(-1.0)) / scalar(180.0);
+            vector nHat = (_bubbleNormal == vector::zero) ? vector(0,0,1) : _bubbleNormal/ mag(_bubbleNormal);
+            vector sphereCentre = _bubbleCoordinate + nHat * (_bubbleRadius * Foam::sin(theta));
+
+            // set alpha fields and vapour temperature inside sphere
+            const pointField& Cc = mesh.C();
+            forAll(Cc, ci)
+            {
+                if (mag(Cc[ci] - sphereCentre) <= _bubbleRadius)
+                {
+                    // alpha1 == 0 => vapour, alpha2 == 1 => liquid complement
+                    alpha1[ci] = 0.0;
+                    alpha2[ci] = 1.0;
+
+                    // set vapour temperature to saturation for seeded vapour cells
+                    TV[ci] = TsatField[ci];
+
+                    // keep mixture/diagnostic temperature consistent
+                    T[ci] = TV[ci];
+                }
+            }
+
+            // mark seeded to avoid repeated insertion (unless seedOnce==false)
+            _bubbleSeeded = true;
+
+            // update boundary fields so next steps see the change
+            alpha1.correctBoundaryConditions();
+            alpha2.correctBoundaryConditions();
+            TV.correctBoundaryConditions();
+            T.correctBoundaryConditions();
+            Info << "bubbleSeeding: bubble inserted (centre=" << sphereCentre
+                 << ", R=" << _bubbleRadius << ")" << endl;
+        }
+    }
+}
