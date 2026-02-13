@@ -568,24 +568,24 @@ forAll(fluidRegions, i)
 	cumulativeContErrFluid[i] = cumulativeContErrIO.value();
 
 
-	// if(mixture.found("writeQwall"))
-  //   {
-	// 		qwFluid.set
-  //       (
-	// 			 i,
-	// 			 new volVectorField
-	// 			 (
-	// 				IOobject
-	// 				(
-	// 				 "qw",
-	// 				 runTime.timeName(),
-	// 				 fluidRegions[i],
-	// 				 IOobject::NO_READ,
-	// 				 IOobject::AUTO_WRITE
-	// 				),
-	// 				-kappaFluid[i]*fvc::grad(TFluid[i])
-	// 			 )
-  //       );
-  //   }
+	if(mixture.found("writeQwall"))
+    {
+			qwFluid.set
+        (
+				 i,
+				 new volVectorField
+				 (
+					IOobject
+					(
+					 "qw",
+					 runTime.timeName(),
+					 fluidRegions[i],
+					 IOobject::NO_READ,
+					 IOobject::AUTO_WRITE
+					),
+					-kappaFluid[i]*fvc::grad(TFluid[i])
+				 )
+        );
+    }
 
 }

@@ -139,19 +139,19 @@ surfaceScalarField rhoPhi
     fvc::interpolate(rho)*phi
 );
 
-// volScalarField rhoCp
-// (
-//     IOobject
-//     (
-//         "rhoCp",
-//         runTime.timeName(),
-//         mesh,
-//         IOobject::READ_IF_PRESENT
-//     ),
-//     alpha1*rho1*cp1 + alpha2*rho2*cp2,
-//     alpha1.boundaryField().types()
-// );
-// rhoCp.oldTime();
+volScalarField rhoCp
+(
+    IOobject
+    (
+        "rhoCp",
+        runTime.timeName(),
+        mesh,
+        IOobject::READ_IF_PRESENT
+    ),
+    alpha1*rho1*cp1 + alpha2*rho2*cp2,
+    alpha1.boundaryField().types()
+);
+rhoCp.oldTime();
 
 
 //Energy flux

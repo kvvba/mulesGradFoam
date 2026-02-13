@@ -96,7 +96,7 @@ int main(int argc, char *argv[])
     {
         #include "readTimeControls.H"
         #include "readSolidTimeControls.H"
-        // #include "readPISOControls.H"
+        #include "readPresimControls.H"
 			  // #include "readMeshControls.H"
 
         #include "incompressibleMultiRegionCourantNo.H"
@@ -136,6 +136,13 @@ int main(int argc, char *argv[])
         runTime.write();
 
         runTime.printExecutionTime(Info);
+				if(stopWhenConverged && converged)
+        {
+            Info<< "All fluxes are converged."
+                << "The simulation ends here." << endl;
+
+            runTime.writeAndEnd();
+        }
     }
 
     Info<< "End\n" << endl;

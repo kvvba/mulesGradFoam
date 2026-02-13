@@ -53,3 +53,8 @@ for (int corr=0; corr<nCorr; corr++)
 	}
 
 turbulence.correct();
+
+if(computeFluxes)
+				{
+								#include "computeFluidHeatFluxes.H"
+				}
