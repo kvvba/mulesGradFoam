@@ -74,56 +74,14 @@ fv::options& fvOptions = fluidFvOptions[i];
 const label pRefCell = pRefCellFluid[i];
 const scalar pRefValue = pRefValueFluid[i];
 
-dictionary phase1 = mixture.subDict(mixture.phase1Name());
-dictionary phase2 = mixture.subDict(mixture.phase2Name());
-dictionary pcProperties = mixture.subDict("PhaseChangeProperties");
-
-const dimensionedScalar k1
-(
-    "kappa",
-    dimensionSet(1,1,-3,-1,0,0,0),
-    readScalar(phase1.lookup("kappa"))
-);
-const dimensionedScalar cp1
-(
-    "Cp",
-    dimensionSet(0,2,-2,-1,0,0,0),
-    readScalar(phase1.lookup("Cp"))
-);
-
-const dimensionedScalar k2
-(
-    "kappa",
-    dimensionSet(1,1,-3,-1,0,0,0),
-    readScalar(phase2.lookup("kappa"))
-);
-const dimensionedScalar cp2
-(
-    "Cp",
-    dimensionSet(0,2,-2,-1,0,0,0),
-    readScalar(phase2.lookup("Cp"))
-);
-
-const dimensionedScalar Tsat
-(
-    "Tsat",
-    dimTemperature,
-    readScalar(pcProperties.lookup("Tsat"))
-);
-
-const dimensionedScalar hlv
-(
-    "hlv",
-    dimensionSet(0,2,-2,0,0,0,0),
-    readScalar(pcProperties.lookup("hlv"))
-);
-
-const dimensionedScalar diff
-(
- "diff",
- dimensionSet(0,2,0,0,0,0,0),
- readScalar(pcProperties.lookup("diff"))
- );
+// Use cached phase properties instead of repeated dictionary lookups
+const dimensionedScalar& k1 = k1Fluid[i];
+const dimensionedScalar& k2 = k2Fluid[i];
+const dimensionedScalar& cp1 = cp1Fluid[i];
+const dimensionedScalar& cp2 = cp2Fluid[i];
+const dimensionedScalar& Tsat = TsatFluid[i];
+const dimensionedScalar& hlv = hlvFluid[i];
+const dimensionedScalar& diff = diffFluid[i];
 
 // Mass flux
 surfaceScalarField rhoPhi
@@ -322,6 +280,7 @@ static vector _bubbleNormal = vector::zero;
 static scalar _bubbleContactAngleDeg = 90.0;
 static scalar _bubbleRadius = 0.0;
 static bool _bubbleSeedOnce = true;
+static autoPtr<meshSearch> _bubbleMeshSearch; // Cached spatial search structure
 
 if (!_bubbleSeedingInit)
 {
@@ -350,18 +309,13 @@ if (!_bubbleSeedingInit)
 
         if (_bubbleRadius > 0 && _bubbleActivationT < GREAT)
         {
-            // find nearest cell to seed coordinate (cache index)
-            const pointField& Cc = mesh.C();
-            scalar bestDist2 = GREAT;
-            forAll(Cc, ci)
+            // Use meshSearch for efficient spatial lookup of nearest cell
+            if (!_bubbleMeshSearch.valid())
             {
-                const scalar d2 = magSqr(Cc[ci] - _bubbleCoordinate);
-                if (d2 < bestDist2)
-                {
-                    bestDist2 = d2;
-                    _bubbleSeedCell = ci;
-                }
+                _bubbleMeshSearch.reset(new meshSearch(mesh));
             }
+            
+            _bubbleSeedCell = _bubbleMeshSearch->findCell(_bubbleCoordinate);
 
             if (_bubbleSeedCell < 0)
             {

@@ -63,6 +63,7 @@ Description
 #include "cutCellIso.H"
 #include "isoAlpha.H"
 #include "implicitInterfaceDiffFlux.H"
+#include "meshSearch.H"
 // #include "explicitInterfaceDiffFlux.H"
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
