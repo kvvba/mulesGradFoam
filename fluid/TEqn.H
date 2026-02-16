@@ -50,33 +50,12 @@ surfaceScalarField kappaVf(fvc::interpolate(kappaV));
 	}
 }
 
-volScalarField rhoCpL
-(
-	IOobject
-	(
-		"rhoCpL",
-		runTime.timeName(),
-		mesh,
-		IOobject::NO_READ,
-		IOobject::AUTO_WRITE
-	),
-	mesh,
-	rho1 * cp1
-);
+// Persistent fields (allocated once in createFluidFields.H)
+volScalarField& rhoCpL = rhoCpLFluid[i];
+rhoCpL = rho1 * cp1;
 
-volScalarField rhoCpV
-(
-	IOobject
-	(
-		"rhoCpV",
-		runTime.timeName(),
-		mesh,
-		IOobject::NO_READ,
-		IOobject::AUTO_WRITE
-	),
-	mesh,
-	rho2 * cp2
-);
+volScalarField& rhoCpV = rhoCpVFluid[i];
+rhoCpV = rho2 * cp2;
 
 forAll(rhoCpL, celli)
 {
@@ -136,8 +115,6 @@ TVEqn.solve();
 T = TL*alpha1 + TV*alpha2;
 
 T.correctBoundaryConditions();
-
-mixture.correct();
 
 Info << "Min(TL) = " << min(TL).value() << " Max(TL) = " << max(TL).value() << endl;
 Info << "Min(TV) = " << min(TV).value() << " Max(TV) = " << max(TV).value() << endl;

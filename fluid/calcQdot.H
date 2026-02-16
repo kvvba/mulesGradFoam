@@ -1,8 +1,17 @@
-boolList interfaceCells(alpha1.mesh().nCells(), false);
-DynamicList<label> VapourCellsLabels(alpha1.mesh().nCells()/2);
-DynamicList<label> LiquidCellsLabels(alpha1.mesh().nCells()/2);
-boolList vapourCells(alpha1.mesh().nCells(), false);
-boolList liquidCells(alpha1.mesh().nCells(), false);
+// Persistent lists (allocated once in createFluidFields.H, cleared each timestep)
+boolList& interfaceCells = interfaceCellsFluid[i];
+interfaceCells.setSize(mesh.nCells());
+interfaceCells = false;
+DynamicList<label>& VapourCellsLabels = VapourCellsLabelsFluid[i];
+VapourCellsLabels.clear();
+DynamicList<label>& LiquidCellsLabels = LiquidCellsLabelsFluid[i];
+LiquidCellsLabels.clear();
+boolList& vapourCells = vapourCellsFluid[i];
+vapourCells.setSize(mesh.nCells());
+vapourCells = false;
+boolList& liquidCells = liquidCellsFluid[i];
+liquidCells.setSize(mesh.nCells());
+liquidCells = false;
 
 scalarField ap
 (
@@ -48,7 +57,7 @@ forAll (alpha1, celli)
 		}
 }
 
-implicitInterfaceDiffFlux impDiffFlux(mesh);
+implicitInterfaceDiffFlux& impDiffFlux = impDiffFluxFluid[i];
 
 tmp<volScalarField> energyFlux1
 (

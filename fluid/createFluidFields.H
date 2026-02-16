@@ -73,6 +73,31 @@ const uniformDimensionedVectorField& g = meshObjects::gravity::New(runTime);
 
 scalarField maxTFluid(fluidRegions.size());
 
+// Persistent material constants per fluid region (read once at startup)
+PtrList<dimensionedScalar> k1Fluid(fluidRegions.size());
+PtrList<dimensionedScalar> k2Fluid(fluidRegions.size());
+PtrList<dimensionedScalar> cp1Fluid(fluidRegions.size());
+PtrList<dimensionedScalar> cp2Fluid(fluidRegions.size());
+PtrList<dimensionedScalar> TsatFluid(fluidRegions.size());
+PtrList<dimensionedScalar> hlvFluid(fluidRegions.size());
+PtrList<dimensionedScalar> diffFluid(fluidRegions.size());
+
+// Persistent fields (avoid per-timestep re-allocation)
+PtrList<volScalarField> TsatFieldFluid(fluidRegions.size());
+PtrList<volScalarField> kappaLFluid(fluidRegions.size());
+PtrList<volScalarField> kappaVFluid(fluidRegions.size());
+PtrList<volScalarField> SAreaFluid(fluidRegions.size());
+PtrList<volScalarField> rhoCpLFluid(fluidRegions.size());
+PtrList<volScalarField> rhoCpVFluid(fluidRegions.size());
+
+// Persistent calcQdot lists (avoid per-timestep allocation)
+List<boolList> interfaceCellsFluid(fluidRegions.size());
+List<boolList> vapourCellsFluid(fluidRegions.size());
+List<boolList> liquidCellsFluid(fluidRegions.size());
+List<DynamicList<label>> VapourCellsLabelsFluid(fluidRegions.size());
+List<DynamicList<label>> LiquidCellsLabelsFluid(fluidRegions.size());
+PtrList<implicitInterfaceDiffFlux> impDiffFluxFluid(fluidRegions.size());
+
 // Populate fluid field pointer lists
 forAll(fluidRegions, i)
 {
@@ -373,6 +398,171 @@ forAll(fluidRegions, i)
 			)
 		 );
 
+	// Store material constants persistently (read once at startup)
+	{
+		dimensionedScalar cp1_init
+		(
+			"Cp",
+			dimensionSet(0,2,-2,-1,0,0,0),
+			readScalar(phase1.lookup("Cp"))
+		);
+		dimensionedScalar cp2_init
+		(
+			"Cp",
+			dimensionSet(0,2,-2,-1,0,0,0),
+			readScalar(phase2.lookup("Cp"))
+		);
+		dictionary pcProperties = mixture.subDict("PhaseChangeProperties");
+
+		k1Fluid.set(i, new dimensionedScalar(k1));
+		k2Fluid.set(i, new dimensionedScalar(k2));
+		cp1Fluid.set(i, new dimensionedScalar(cp1_init));
+		cp2Fluid.set(i, new dimensionedScalar(cp2_init));
+		TsatFluid.set
+		(
+			i,
+			new dimensionedScalar
+			(
+				"Tsat",
+				dimTemperature,
+				readScalar(pcProperties.lookup("Tsat"))
+			)
+		);
+		hlvFluid.set
+		(
+			i,
+			new dimensionedScalar
+			(
+				"hlv",
+				dimensionSet(0,2,-2,0,0,0,0),
+				readScalar(pcProperties.lookup("hlv"))
+			)
+		);
+		diffFluid.set
+		(
+			i,
+			new dimensionedScalar
+			(
+				"diff",
+				dimensionSet(0,2,0,0,0,0,0),
+				readScalar(pcProperties.lookup("diff"))
+			)
+		);
+
+		// Persistent constant fields
+		TsatFieldFluid.set
+		(
+			i,
+			new volScalarField
+			(
+				IOobject
+				(
+					"TsatField",
+					runTime.timeName(),
+					fluidRegions[i],
+					IOobject::NO_READ,
+					IOobject::NO_WRITE
+				),
+				fluidRegions[i],
+				TsatFluid[i]
+			)
+		);
+		kappaLFluid.set
+		(
+			i,
+			new volScalarField
+			(
+				IOobject
+				(
+					"kappa1Field",
+					runTime.timeName(),
+					fluidRegions[i],
+					IOobject::NO_READ,
+					IOobject::NO_WRITE
+				),
+				fluidRegions[i],
+				k1
+			)
+		);
+		kappaVFluid.set
+		(
+			i,
+			new volScalarField
+			(
+				IOobject
+				(
+					"kappa2Field",
+					runTime.timeName(),
+					fluidRegions[i],
+					IOobject::NO_READ,
+					IOobject::NO_WRITE
+				),
+				fluidRegions[i],
+				k2
+			)
+		);
+
+		// Persistent reusable fields
+		SAreaFluid.set
+		(
+			i,
+			new volScalarField
+			(
+				IOobject
+				(
+					"SArea",
+					runTime.timeName(),
+					fluidRegions[i],
+					IOobject::NO_READ,
+					IOobject::NO_WRITE
+				),
+				fluidRegions[i],
+				dimensionedScalar(dimless/dimLength, Zero)
+			)
+		);
+		rhoCpLFluid.set
+		(
+			i,
+			new volScalarField
+			(
+				IOobject
+				(
+					"rhoCpL",
+					runTime.timeName(),
+					fluidRegions[i],
+					IOobject::NO_READ,
+					IOobject::NO_WRITE
+				),
+				fluidRegions[i],
+				rho1 * cp1_init
+			)
+		);
+		rhoCpVFluid.set
+		(
+			i,
+			new volScalarField
+			(
+				IOobject
+				(
+					"rhoCpV",
+					runTime.timeName(),
+					fluidRegions[i],
+					IOobject::NO_READ,
+					IOobject::NO_WRITE
+				),
+				fluidRegions[i],
+				rho2 * cp2_init
+			)
+		);
+
+		// Persistent calcQdot lists
+		interfaceCellsFluid[i].setSize(fluidRegions[i].nCells(), false);
+		vapourCellsFluid[i].setSize(fluidRegions[i].nCells(), false);
+		liquidCellsFluid[i].setSize(fluidRegions[i].nCells(), false);
+		VapourCellsLabelsFluid[i].reserve(fluidRegions[i].nCells()/2);
+		LiquidCellsLabelsFluid[i].reserve(fluidRegions[i].nCells()/2);
+		impDiffFluxFluid.set(i, new implicitInterfaceDiffFlux(fluidRegions[i]));
+	}
 
 	Info<< "    Adding to TFluid\n" << endl;
 	TFluid.set

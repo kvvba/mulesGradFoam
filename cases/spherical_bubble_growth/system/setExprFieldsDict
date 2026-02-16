@@ -34,15 +34,11 @@ expressions
      dimensions [0 0 0 1 0 0 0];
      constants
      {
-         bubbleRadius 9.69812679359357e-05;
-         n #eval{(1/1) * 96.98};
-         // n 193.96;
-
+        rbub 9.69812679359357e-05;
+        
          c1 5.0;
          c2 261332.30671579743; // using real water properties
-         // c2 184789.84622186306; // 2 * kappaL, sqrt(2) * rhov
-         // c2 369579.6924437261; // 0.5 * kappaL, sqrt(0.5) * rhov
-         
+  
          a1 0.254829592;
          a2 -0.284496736;
          a3 1.421413741;
@@ -51,10 +47,9 @@ expressions
      }
      variables
      (
-      // "dx = 2.5 * ${constants.bubbleRadius}/${constants.n}"
-      "dx = 15.0e-6"
-      "xi = mag(pos() - vector(dx, dx, dx)) - ${constants.bubbleRadius}"
-      // "xi = mag(pos()) - ${constants.bubbleRadius}"
+      "dx = 1.0e-6"
+      "xi = mag(pos() - vector(dx, dx, dx)) - ${constants.rbub}"
+      // "xi = mag(pos()) - ${constants.rbub}"
       "z = xi*${constants.c2}"
       "T = 1/(1 + 0.3275911*z)"
       "erfz = 1 - (${constants.a1}*T + ${constants.a2}*pow(T,2.0) + ${constants.a3}*pow(T,3.0) + ${constants.a4}*pow(T,4.0) + ${constants.a5}*pow(T,5.0))*exp(-pow(z,2.0))"
@@ -77,14 +72,11 @@ expressions
      constants
      {
          rbub 9.69812679359357e-05;
-         l 9.69812679359357e-05;
-         n #eval{(1/1) * 96.98};
-         // n 193.96;
      }
      variables
      (
       // "dx = ${constants.l} / ${constants.n}"
-      "dx = 15.0e-6"
+      "dx = 1.0e-6"
       "dd = - mag(pos()) + ${constants.rbub}"
       "eps = 1.5 * dx"
      );
@@ -105,15 +97,11 @@ expressions
      constants
      {
          rbub 9.69812679359357e-05;
-         l 9.69812679359357e-05;
-         n #eval{(1/1) * 96.98};
-         // n 193.96;
          pi #eval{pi()};
      }
      variables
      (
-      // "dx = ${constants.l} / ${constants.n}"
-      "dx = 15.0e-6"
+      "dx = 1.0e-6"
       "dd = - mag(pos()) + ${constants.rbub}"
       "eps = 1.5 * dx"
       "aexpr=0.5-dd/(2.0*eps)-1.0/(2.0*${constants.pi})*sin(${constants.pi}*dd/eps)"
@@ -134,14 +122,10 @@ expressions
      constants
      {
          rbub 9.69812679359357e-05;
-         l 9.69812679359357e-05;
-         n #eval{(1/1) * 96.98};
-         // n 193.96;
      }
      variables
      (
-      // "dx = ${constants.l} / ${constants.n}"
-      "dx = 15.0e-6"
+      "dx = 1.0e-6"
       "dd = - mag(pos()) + ${constants.rbub}"
       "eps = 1.5 * dx"
      );
