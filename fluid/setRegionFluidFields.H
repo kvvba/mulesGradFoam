@@ -74,9 +74,9 @@ fv::options& fvOptions = fluidFvOptions[i];
 const label pRefCell = pRefCellFluid[i];
 const scalar pRefValue = pRefValueFluid[i];
 
-dictionary phase1 = mixture.subDict(mixture.phase1Name());
-dictionary phase2 = mixture.subDict(mixture.phase2Name());
-dictionary pcProperties = mixture.subDict("PhaseChangeProperties");
+const dictionary& phase1 = mixture.subDict(mixture.phase1Name());
+const dictionary& phase2 = mixture.subDict(mixture.phase2Name());
+const dictionary& pcProperties = mixture.subDict("PhaseChangeProperties");
 
 const dimensionedScalar k1
 (

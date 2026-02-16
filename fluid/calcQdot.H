@@ -1,6 +1,6 @@
 boolList interfaceCells(alpha1.mesh().nCells(), false);
-labelList VapourCellsLabels;
-labelList LiquidCellsLabels;
+DynamicList<label> VapourCellsLabels(alpha1.mesh().nCells()/2);
+DynamicList<label> LiquidCellsLabels(alpha1.mesh().nCells()/2);
 boolList vapourCells(alpha1.mesh().nCells(), false);
 boolList liquidCells(alpha1.mesh().nCells(), false);
 

@@ -30,56 +30,38 @@ License
 surfaceScalarField kappaLf(fvc::interpolate(kappaL));
 surfaceScalarField kappaVf(fvc::interpolate(kappaV));
 
-const labelList& owner = mesh.owner();
-const labelList& neighbour = mesh.neighbour();
-
-forAll(kappaLf, facei)
 {
-	const label& own = owner[facei];
-	const label& nei = neighbour[facei];
-	const scalar vapourOwn = vapourCells[own];
-	const scalar vapourNei = vapourCells[nei];
-	const scalar liquidOwn = liquidCells[own];
-	const scalar liquidNei = liquidCells[nei];
+	const labelList& owner = mesh.owner();
+	const labelList& neighbour = mesh.neighbour();
 
-	if (vapourOwn || vapourNei)
-		// cell or neighbour cell is on the vapour side
+	forAll(kappaLf, facei)
+	{
+		const label own = owner[facei];
+		const label nei = neighbour[facei];
+
+		if (vapourCells[own] || vapourCells[nei])
 		{
 			kappaLf[facei] = 0.0;
 		}
-	if (liquidOwn || liquidNei)
-		// cell or neighbour cell is on the liquid side
+		if (liquidCells[own] || liquidCells[nei])
 		{
 			kappaVf[facei] = 0.0;
 		}
+	}
 }
 
 volScalarField rhoCpL
 (
- IOobject
- (
 	"rhoCpL",
-	runTime.timeName(),
 	mesh,
-	IOobject::NO_READ,
-	IOobject::NO_WRITE
- ),
- mesh,
- rho1 * cp1
+	rho1 * cp1
 );
 
 volScalarField rhoCpV
 (
- IOobject
- (
 	"rhoCpV",
-	runTime.timeName(),
 	mesh,
-	IOobject::NO_READ,
-	IOobject::NO_WRITE
- ),
- mesh,
- rho2 * cp2
+	rho2 * cp2
 );
 
 forAll(rhoCpL, celli)

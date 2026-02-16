@@ -177,14 +177,15 @@ Foam::tmp<Foam::volScalarField> Foam::implicitInterfaceDiffFlux::diffusiveFlux
 
             forAll(neiPhiValues,i)
             {
-                scalar phiNeiValue = neiPhiValues[i];
-                vector dist = neiDistValues[i];
-                scalar deltaPhi = phiNeiValue-bcValue;
-                scalar d = mag(dist & n);
-                scalar cosAngle = (dist/mag(dist)) & n;
-                scalar weight = pow(mag(cosAngle),4);
-                avgdPhidN += deltaPhi/d*weight;
-                avgWeight += weight;
+                const scalar phiNeiValue = neiPhiValues[i];
+                const vector& dist = neiDistValues[i];
+                const scalar deltaPhi = phiNeiValue-bcValue;
+                const scalar d = mag(dist & n);
+                const scalar cosAngle = (dist/mag(dist)) & n;
+                scalar w = cosAngle*cosAngle;
+                w *= w; // pow4
+                avgdPhidN += deltaPhi/d*w;
+                avgWeight += w;
             }
 
             if (avgWeight != 0)
@@ -269,20 +270,24 @@ Foam::tmp<Foam::fvScalarMatrix> Foam::implicitInterfaceDiffFlux::diffusiveFlux
                 neiIndicies
             );
 
+            // Pre-compute weights in a single pass to avoid
+            // redundant pow()/mag() in the second loop
+            DynamicField<scalar> neiWeights(neiPhiValues.size());
             forAll(neiPhiValues,i)
             {
                 scalar cosAngle = (neiDistValues[i]/mag(neiDistValues[i])) & n;
-                scalar weight = pow(mag(cosAngle),4);
-                avgWeight += weight;
+                scalar w = cosAngle*cosAngle;
+                w *= w; // pow4
+                neiWeights.append(w);
+                avgWeight += w;
             }
+
+            const scalar gammaArea = gamma[celli]*area;
 
             forAll(neiPhiValues,i)
             {
-                vector dist = neiDistValues[i];
-                scalar cosAngle = (dist/mag(dist)) & n;
-                scalar weight = pow(mag(cosAngle),4);
-                scalar weightDist = weight/mag(dist & n);
-                scalar distFlux = weightDist/avgWeight*gamma[celli]*area;
+                scalar weightDist = neiWeights[i]/mag(neiDistValues[i] & n);
+                scalar distFlux = weightDist/avgWeight*gammaArea;
                 if (gblNumbering.isLocal(neiIndicies[i]))
                 {
                     const label lclNeiCelli = getCellLabel
@@ -440,16 +445,20 @@ void Foam::implicitInterfaceDiffFlux::diffusiveFlux
                 neiIndicies
             );
 
+            // Pre-compute weights in a single pass
+            DynamicField<scalar> neiWeights(neiPhiValues.size());
             forAll(neiPhiValues,i)
             {
-                scalar phiNeiValue = neiPhiValues[i];
-                vector dist = neiDistValues[i];
-                scalar deltaPhi = phiNeiValue-bcValue;
-                scalar d = mag(dist & n);
-                scalar cosAngle = (neiDistValues[i]/mag(neiDistValues[i])) & n;
-                scalar weight = pow(mag(cosAngle),4);
-                avgdPhidN += deltaPhi/d*weight;
-                avgWeight += weight;
+                const scalar phiNeiValue = neiPhiValues[i];
+                const vector& dist = neiDistValues[i];
+                const scalar deltaPhi = phiNeiValue-bcValue;
+                const scalar d = mag(dist & n);
+                const scalar cosAngle = (dist/mag(dist)) & n;
+                scalar w = cosAngle*cosAngle;
+                w *= w; // pow4
+                neiWeights.append(w);
+                avgdPhidN += deltaPhi/d*w;
+                avgWeight += w;
             }
 
             if (avgWeight != 0)
@@ -457,14 +466,13 @@ void Foam::implicitInterfaceDiffFlux::diffusiveFlux
                 diffFlux[celli] = avgdPhidN/avgWeight*gamma[celli]*areaPerVol;
             }
 
+            const scalar gammaNormalMag = gamma[celli]*mag(normal[celli]);
+
             forAll(neiPhiValues,i)
             {
-                vector dist = neiDistValues[i];
-                scalar cosAngle = (dist/mag(dist)) & n;
-                scalar weight = pow(mag(cosAngle),4);
-                scalar weightDist = weight/mag(dist & n);
+                scalar weightDist = neiWeights[i]/mag(neiDistValues[i] & n);
                 scalar distFlux =
-                    weightDist/avgWeight*gamma[celli]*mag(normal[celli]);
+                    weightDist/avgWeight*gammaNormalMag;
                 if (gblNumbering.isLocal(neiIndicies[i]))
                 {
                     const label lclNeiCelli = getCellLabel

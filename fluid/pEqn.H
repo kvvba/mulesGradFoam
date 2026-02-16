@@ -26,14 +26,7 @@
 	along with mulesGradFoam.  If not, see <http://www.gnu.org/licenses/>.
 		
 	\*---------------------------------------------------------------------------*/
-if (correctPhi)
-	{
-		rAU = 1.0/UEqn.A();
-	}
- else
-	 {
-		 rAU = 1.0/UEqn.A();
-	 }
+rAU = 1.0/UEqn.A();
 
 surfaceScalarField rAUf("rAUf", fvc::interpolate(rAU));
 volVectorField HbyA(constrainHbyA(rAU*UEqn.H(), U, p_rgh));
