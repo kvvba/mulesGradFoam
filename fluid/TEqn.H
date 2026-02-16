@@ -52,14 +52,28 @@ surfaceScalarField kappaVf(fvc::interpolate(kappaV));
 
 volScalarField rhoCpL
 (
-	"rhoCpL",
+	IOobject
+	(
+		"rhoCpL",
+		runTime.timeName(),
+		mesh,
+		IOobject::NO_READ,
+		IOobject::AUTO_WRITE
+	),
 	mesh,
 	rho1 * cp1
 );
 
 volScalarField rhoCpV
 (
-	"rhoCpV",
+	IOobject
+	(
+		"rhoCpV",
+		runTime.timeName(),
+		mesh,
+		IOobject::NO_READ,
+		IOobject::AUTO_WRITE
+	),
 	mesh,
 	rho2 * cp2
 );
