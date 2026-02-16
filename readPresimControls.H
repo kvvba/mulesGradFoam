@@ -1,14 +1,14 @@
 fvSolution solutionDict(runTime);
 
-const dictionary& presimControl = solutionDict.subDict("presimControl");
+const dictionary* presimControlPtr = solutionDict.findDict("presimControl");
 
 const Switch computeFluxes =
-				presimControl.getOrDefault<Switch>("computeFluxes", false);
+    presimControlPtr ? presimControlPtr->getOrDefault<Switch>("computeFluxes", false) : Switch(false);
 
 bool converged(false);
 
 const Switch stopWhenConverged =
-				presimControl.getOrDefault<Switch>("stopWhenConverged", false);
+    presimControlPtr ? presimControlPtr->getOrDefault<Switch>("stopWhenConverged", false) : Switch(false);
 
-const scalar fluxTol(presimControl.getOrDefault<double>("fluxTolerance", 1e-8));
-const scalar TTol(presimControl.getOrDefault<double>("TTolerance", 1e-8));
+const scalar fluxTol(presimControlPtr ? presimControlPtr->getOrDefault<double>("fluxTolerance", 1e-8) : 1e-8);
+const scalar TTol(presimControlPtr ? presimControlPtr->getOrDefault<double>("TTolerance", 1e-8) : 1e-8);
