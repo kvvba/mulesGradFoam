@@ -39,59 +39,35 @@ fvScalarMatrix mDotEqn
 
 mDotEqn.solve();
 
-// Compute vapour/liquid volume-weighted redistribution in-place
-// to avoid creating 4+ full-mesh temporary fields
-{
-	dimensionedScalar NNum = fvc::domainIntegrate(mDot);
+volScalarField epsilonV = 0.001 - alpha1;
+volScalarField vapourCutoff = pos(epsilonV);
 
-	// Accumulate weighted integrals without separate cutoff fields
-	scalar NVDenVal = 0.0;
-	scalar NLDenVal = 0.0;
+volScalarField epsilonL = alpha1 - 0.999;
+volScalarField liquidCutoff = pos(epsilonL);
+	
+dimensionedScalar NNum = fvc::domainIntegrate(mDot);
+	
+volScalarField vapourVolGen = mDot * epsilonV * vapourCutoff;
+dimensionedScalar NVDen = fvc::domainIntegrate(vapourVolGen);
 
-	const scalarField& alpha1In = alpha1.primitiveField();
-	const scalarField& mDotIn = mDot.primitiveField();
-	const scalarField& Vol = mesh.V();
+volScalarField liquidVolGen = mDot * epsilonL * liquidCutoff;
+dimensionedScalar NLDen = fvc::domainIntegrate(liquidVolGen);
 
-	forAll(alpha1In, celli)
-	{
-		const scalar epsilonV = 0.001 - alpha1In[celli];
-		if (epsilonV > 0)
-		{
-			NVDenVal += mDotIn[celli] * epsilonV * Vol[celli];
-		}
-		const scalar epsilonL = alpha1In[celli] - 0.999;
-		if (epsilonL > 0)
-		{
-			NLDenVal += mDotIn[celli] * epsilonL * Vol[celli];
-		}
-	}
+dimensionedScalar NV("NV", dimless, 2.0);
+dimensionedScalar NL("NL", dimless, 2.0);
 
-	reduce(NVDenVal, sumOp<scalar>());
-	reduce(NLDenVal, sumOp<scalar>());
+if(NVDen.value() != 0){NV = NNum/NVDen;}
+if(NLDen.value() != 0){NL = NNum/NLDen;}
 
-	const scalar NV = (NVDenVal != 0) ? NNum.value() / NVDenVal : 2.0;
-	const scalar NL = (NLDenVal != 0) ? NNum.value() / NLDenVal : 2.0;
+// dimensionedScalar NV = NNum / NVDen;
+// dimensionedScalar NL = NNum / NLDen;
 
-	Info << "NV = " << NV << ", NL = " << NL << endl;
+Info << "NV = " << NV.value() << ", NL = " << NL.value() << endl;
 
-	// Rewrite mDot in a single pass
-	scalarField& mDotIn_ref = mDot.primitiveFieldRef();
-	forAll(alpha1In, celli)
-	{
-		scalar val = 0.0;
-		const scalar epsilonV = 0.001 - alpha1In[celli];
-		if (epsilonV > 0)
-		{
-			val += NV * mDotIn[celli] * epsilonV;
-		}
-		const scalar epsilonL = alpha1In[celli] - 0.999;
-		if (epsilonL > 0)
-		{
-			val -= NL * mDotIn[celli] * epsilonL;
-		}
-		mDotIn_ref[celli] = val;
-	}
-}
+vapourVolGen = NV * vapourCutoff * mDot * epsilonV;
+liquidVolGen = - NL * liquidCutoff * mDot * epsilonL;
+
+mDot = vapourVolGen + liquidVolGen;
 
 const scalar mEvap = gSum( qDot/hlv * mesh.V());
   

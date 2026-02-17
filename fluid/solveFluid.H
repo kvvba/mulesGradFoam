@@ -29,6 +29,8 @@ License
 
 mesh.update();
 
+mixture.correct();
+
 #include "alphaControls.H"
 #include "alphaEqnSubCycle.H"
 

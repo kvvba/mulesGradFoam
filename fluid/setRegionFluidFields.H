@@ -74,13 +74,56 @@ fv::options& fvOptions = fluidFvOptions[i];
 const label pRefCell = pRefCellFluid[i];
 const scalar pRefValue = pRefValueFluid[i];
 
-// Material constants (read once at startup, stored in PtrLists)
-const dimensionedScalar& k1 = k1Fluid[i];
-const dimensionedScalar& cp1 = cp1Fluid[i];
-const dimensionedScalar& k2 = k2Fluid[i];
-const dimensionedScalar& cp2 = cp2Fluid[i];
-const dimensionedScalar& hlv = hlvFluid[i];
-const dimensionedScalar& diff = diffFluid[i];
+dictionary phase1 = mixture.subDict(mixture.phase1Name());
+dictionary phase2 = mixture.subDict(mixture.phase2Name());
+dictionary pcProperties = mixture.subDict("PhaseChangeProperties");
+
+const dimensionedScalar k1
+(
+    "kappa",
+    dimensionSet(1,1,-3,-1,0,0,0),
+    readScalar(phase1.lookup("kappa"))
+);
+const dimensionedScalar cp1
+(
+    "Cp",
+    dimensionSet(0,2,-2,-1,0,0,0),
+    readScalar(phase1.lookup("Cp"))
+);
+
+const dimensionedScalar k2
+(
+    "kappa",
+    dimensionSet(1,1,-3,-1,0,0,0),
+    readScalar(phase2.lookup("kappa"))
+);
+const dimensionedScalar cp2
+(
+    "Cp",
+    dimensionSet(0,2,-2,-1,0,0,0),
+    readScalar(phase2.lookup("Cp"))
+);
+
+const dimensionedScalar Tsat
+(
+    "Tsat",
+    dimTemperature,
+    readScalar(pcProperties.lookup("Tsat"))
+);
+
+const dimensionedScalar hlv
+(
+    "hlv",
+    dimensionSet(0,2,-2,0,0,0,0),
+    readScalar(pcProperties.lookup("hlv"))
+);
+
+const dimensionedScalar diff
+(
+ "diff",
+ dimensionSet(0,2,0,0,0,0,0),
+ readScalar(pcProperties.lookup("diff"))
+ );
 
 // Mass flux
 surfaceScalarField rhoPhi
@@ -201,10 +244,59 @@ volScalarField rAU
     dimensionedScalar("rAU", dimTime/dimDensity, 1)
 );
 
-// Persistent fields (allocated once in createFluidFields.H)
-const volScalarField& TsatField = TsatFieldFluid[i];
-const volScalarField& kappaL = kappaLFluid[i];
-const volScalarField& kappaV = kappaVFluid[i];
+const volScalarField TsatField
+(
+ IOobject
+ (
+	"TsatField",
+	runTime.timeName(),
+	mesh,
+	IOobject::NO_READ,
+	IOobject::NO_WRITE
+ ),
+ mesh,
+ Tsat
+);
 
-volScalarField& SArea = SAreaFluid[i];
-SArea = dimensionedScalar(dimless/dimLength, Zero);
+const volScalarField kappaL
+(
+ IOobject
+ (
+	"kappa1Field",
+	runTime.timeName(),
+	mesh,
+	IOobject::NO_READ,
+	IOobject::NO_WRITE
+ ),
+ mesh,
+ k1
+);
+
+const volScalarField kappaV
+(
+ IOobject
+ (
+	"kappa2Field",
+	runTime.timeName(),
+	mesh,
+	IOobject::NO_READ,
+	IOobject::NO_WRITE
+ ),
+ mesh,
+ k2
+);
+
+// scalar isoFaceTol = 1.0e-8;
+volScalarField SArea
+(
+ IOobject
+ (
+	"SArea",
+	runTime.timeName(),
+	mesh,
+	IOobject::NO_READ,
+	IOobject::AUTO_WRITE
+	),
+ mesh,
+ dimensionedScalar(dimless/dimLength, Zero)
+ );

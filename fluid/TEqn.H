@@ -30,32 +30,57 @@ License
 surfaceScalarField kappaLf(fvc::interpolate(kappaL));
 surfaceScalarField kappaVf(fvc::interpolate(kappaV));
 
+const labelList& owner = mesh.owner();
+const labelList& neighbour = mesh.neighbour();
+
+forAll(kappaLf, facei)
 {
-	const labelList& owner = mesh.owner();
-	const labelList& neighbour = mesh.neighbour();
+	const label& own = owner[facei];
+	const label& nei = neighbour[facei];
+	const scalar vapourOwn = vapourCells[own];
+	const scalar vapourNei = vapourCells[nei];
+	const scalar liquidOwn = liquidCells[own];
+	const scalar liquidNei = liquidCells[nei];
 
-	forAll(kappaLf, facei)
-	{
-		const label own = owner[facei];
-		const label nei = neighbour[facei];
-
-		if (vapourCells[own] || vapourCells[nei])
+	if (vapourOwn || vapourNei)
+		// cell or neighbour cell is on the vapour side
 		{
 			kappaLf[facei] = 0.0;
 		}
-		if (liquidCells[own] || liquidCells[nei])
+	if (liquidOwn || liquidNei)
+		// cell or neighbour cell is on the liquid side
 		{
 			kappaVf[facei] = 0.0;
 		}
-	}
 }
 
-// Persistent fields (allocated once in createFluidFields.H)
-volScalarField& rhoCpL = rhoCpLFluid[i];
-rhoCpL = rho1 * cp1;
+volScalarField rhoCpL
+(
+ IOobject
+ (
+	"rhoCpL",
+	runTime.timeName(),
+	mesh,
+	IOobject::NO_READ,
+	IOobject::NO_WRITE
+ ),
+ mesh,
+ rho1 * cp1
+);
 
-volScalarField& rhoCpV = rhoCpVFluid[i];
-rhoCpV = rho2 * cp2;
+volScalarField rhoCpV
+(
+ IOobject
+ (
+	"rhoCpV",
+	runTime.timeName(),
+	mesh,
+	IOobject::NO_READ,
+	IOobject::NO_WRITE
+ ),
+ mesh,
+ rho2 * cp2
+);
 
 forAll(rhoCpL, celli)
 {
@@ -115,6 +140,8 @@ TVEqn.solve();
 T = TL*alpha1 + TV*alpha2;
 
 T.correctBoundaryConditions();
+
+mixture.correct();
 
 Info << "Min(TL) = " << min(TL).value() << " Max(TL) = " << max(TL).value() << endl;
 Info << "Min(TV) = " << min(TV).value() << " Max(TV) = " << max(TV).value() << endl;
