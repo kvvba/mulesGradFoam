@@ -290,15 +290,15 @@ if (!_bubbleSeedingInit)
     (
         "bubbleSeeding",
         runTime.constant(),
-        mesh,
+        runTime,
         IOobject::READ_IF_PRESENT,
         IOobject::NO_WRITE
     );
 
     // Use IOobject header check for presence, then construct dictionary from file
-    if (bsHeader.typeHeaderOk<dictionary>(true))
+    if (bsHeader.typeHeaderOk<IOdictionary>(true))
     {
-        dictionary bsDict(runTime.constant()/"bubbleSeeding");
+        IOdictionary bsDict(bsHeader);
 
         _bubbleActivationT = bsDict.getOrDefault<scalar>("activationTemperature", GREAT);
         _bubbleCoordinate = bsDict.getOrDefault<vector>("coordinate", vector::zero);
@@ -309,7 +309,8 @@ if (!_bubbleSeedingInit)
 
         if (_bubbleRadius > 0 && _bubbleActivationT < GREAT)
         {
-            // Use meshSearch for efficient spatial lookup of nearest cell
+            // Use meshSearch for efficient spatial lookup of nearest cell.
+            // In parallel, only the owning processor returns a valid index.
             if (!_bubbleMeshSearch.valid())
             {
                 _bubbleMeshSearch.reset(new meshSearch(mesh));
@@ -317,17 +318,27 @@ if (!_bubbleSeedingInit)
             
             _bubbleSeedCell = _bubbleMeshSearch->findCell(_bubbleCoordinate);
 
-            if (_bubbleSeedCell < 0)
+            // Check across all ranks whether ANY processor found the cell
+            label globalFound = returnReduce
+            (
+                (_bubbleSeedCell >= 0) ? label(1) : label(0),
+                maxOp<label>()
+            );
+
+            if (globalFound == 0)
             {
                 Info<< "bubbleSeeding: could not find a mesh cell for coordinate "
-                    << _bubbleCoordinate << ", disabling seeding." << endl;
+                    << _bubbleCoordinate << " on any processor, disabling seeding." << endl;
                 _bubbleActivationT = GREAT;
             }
             else
             {
-                Info<< "bubbleSeeding: configured seed at cell " << _bubbleSeedCell
+                Info<< "bubbleSeeding: configured seed"
                     << " (coord " << _bubbleCoordinate << ") with R=" << _bubbleRadius
-                    << " contactAngle=" << _bubbleContactAngleDeg << " deg" << endl;
+                    << " contactAngle=" << _bubbleContactAngleDeg << " deg"
+                    << " (cell local to rank "
+                    << (_bubbleSeedCell >= 0 ? Pstream::myProcNo() : -1)
+                    << ")" << endl;
             }
         }
         else
@@ -338,57 +349,65 @@ if (!_bubbleSeedingInit)
     else
     {
         // no bubbleSeeding dictionary — that's fine
+			Info << "No bubbleSeeding dictionary found in " << runTime.constant() << nl;
     }
 }
 
 // Check trigger each timestep (only if configured and not yet seeded or seedOnce==false)
 if (_bubbleActivationT < GREAT && (!_bubbleSeeded || !_bubbleSeedOnce))
 {
-    // sample temperature at the cached/nearest cell
+    // Sample temperature at the cached/nearest cell (only on the owning
+    // processor).  Then use returnReduce so that ALL processors agree on
+    // whether to seed — correctBoundaryConditions() is collective MPI.
+    scalar Tcell = -GREAT;  // default: not reached
     if (_bubbleSeedCell >= 0)
     {
-        scalar Tcell = T.internalField()[_bubbleSeedCell];
+        Tcell = T.internalField()[_bubbleSeedCell];
+    }
 
-        if (Tcell >= _bubbleActivationT)
+    // Collective decision: take the maximum across all ranks
+    scalar TcellGlobal = returnReduce(Tcell, maxOp<scalar>());
+
+    if (TcellGlobal >= _bubbleActivationT)
+    {
+        Info << "bubbleSeeding: activation temperature reached (T=" << TcellGlobal
+             << ") — inserting bubble" << endl;
+
+        // vapour is always represented by alpha1 == 0 (user-specified)
+        // compute spherical centre so the interface meets the wall at the
+        // supplied contact angle: centre = contactPoint + n * (R * sin(theta))
+        scalar theta = _bubbleContactAngleDeg * Foam::acos(scalar(-1.0)) / scalar(180.0);
+        vector nHat = (_bubbleNormal == vector::zero) ? vector(0,0,1) : _bubbleNormal / mag(_bubbleNormal);
+        vector sphereCentre = _bubbleCoordinate + nHat * (_bubbleRadius * Foam::sin(theta));
+
+        // set alpha fields and vapour temperature inside sphere
+        // — runs on ALL processors so each modifies its own local cells
+        const pointField& Cc = mesh.C();
+        forAll(Cc, ci)
         {
-            Info << "bubbleSeeding: activation temperature reached (T=" << Tcell
-                 << ") — inserting bubble" << endl;
-
-            // vapour is always represented by alpha1 == 0 (user-specified)
-            // compute spherical centre so the interface meets the wall at the
-            // supplied contact angle: centre = contactPoint + n * (R * sin(theta))
-            scalar theta = _bubbleContactAngleDeg * Foam::acos(scalar(-1.0)) / scalar(180.0);
-            vector nHat = (_bubbleNormal == vector::zero) ? vector(0,0,1) : _bubbleNormal/ mag(_bubbleNormal);
-            vector sphereCentre = _bubbleCoordinate + nHat * (_bubbleRadius * Foam::sin(theta));
-
-            // set alpha fields and vapour temperature inside sphere
-            const pointField& Cc = mesh.C();
-            forAll(Cc, ci)
+            if (mag(Cc[ci] - sphereCentre) <= _bubbleRadius)
             {
-                if (mag(Cc[ci] - sphereCentre) <= _bubbleRadius)
-                {
-                    // alpha1 == 0 => vapour, alpha2 == 1 => liquid complement
-                    alpha1[ci] = 0.0;
-                    alpha2[ci] = 1.0;
+                // alpha1 == 0 => vapour, alpha2 == 1 => liquid complement
+                alpha1[ci] = 0.0;
+                alpha2[ci] = 1.0;
 
-                    // set vapour temperature to saturation for seeded vapour cells
-                    TV[ci] = TsatField[ci];
+                // set vapour temperature to saturation for seeded vapour cells
+                TV[ci] = TsatField[ci];
 
-                    // keep mixture/diagnostic temperature consistent
-                    T[ci] = TV[ci];
-                }
+                // keep mixture/diagnostic temperature consistent
+                T[ci] = TV[ci];
             }
-
-            // mark seeded to avoid repeated insertion (unless seedOnce==false)
-            _bubbleSeeded = true;
-
-            // update boundary fields so next steps see the change
-            alpha1.correctBoundaryConditions();
-            alpha2.correctBoundaryConditions();
-            TV.correctBoundaryConditions();
-            T.correctBoundaryConditions();
-            Info << "bubbleSeeding: bubble inserted (centre=" << sphereCentre
-                 << ", R=" << _bubbleRadius << ")" << endl;
         }
+
+        // mark seeded to avoid repeated insertion (unless seedOnce==false)
+        _bubbleSeeded = true;
+
+        // update boundary fields — collective MPI, now called by ALL ranks
+        alpha1.correctBoundaryConditions();
+        alpha2.correctBoundaryConditions();
+        TV.correctBoundaryConditions();
+        T.correctBoundaryConditions();
+        Info << "bubbleSeeding: bubble inserted (centre=" << sphereCentre
+             << ", R=" << _bubbleRadius << ")" << endl;
     }
 }
