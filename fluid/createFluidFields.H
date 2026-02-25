@@ -67,6 +67,15 @@ List<bool> alphaRestartFluid(fluidRegions.size(),false);
 
 PtrList<pisoControl> pisoFluid(fluidRegions.size());
 
+// Cached phase properties to avoid repeated dictionary lookups
+PtrList<dimensionedScalar> k1Fluid(fluidRegions.size());
+PtrList<dimensionedScalar> k2Fluid(fluidRegions.size());
+PtrList<dimensionedScalar> cp1Fluid(fluidRegions.size());
+PtrList<dimensionedScalar> cp2Fluid(fluidRegions.size());
+PtrList<dimensionedScalar> TsatFluid(fluidRegions.size());
+PtrList<dimensionedScalar> hlvFluid(fluidRegions.size());
+PtrList<dimensionedScalar> diffFluid(fluidRegions.size());
+
 // PtrList <surfaceScalarField> brackFSFluid(fluidRegions.size());
 
 const uniformDimensionedVectorField& g = meshObjects::gravity::New(runTime);
@@ -340,7 +349,9 @@ forAll(fluidRegions, i)
 
 	dictionary phase1 = mixture.subDict(mixture.phase1Name());
 	dictionary phase2 = mixture.subDict(mixture.phase2Name());
+	dictionary pcProperties = mixture.subDict("PhaseChangeProperties");
 
+	// Cache thermal and phase-change properties to avoid repeated lookups during time steps
 	dimensionedScalar k1
     (
 		 "kappa",
@@ -354,6 +365,50 @@ forAll(fluidRegions, i)
 		 dimensionSet(1,1,-3,-1,0,0,0),
 		 readScalar(phase2.lookup("kappa"))
     );
+
+	dimensionedScalar cp1
+    (
+		 "Cp",
+		 dimensionSet(0,2,-2,-1,0,0,0),
+		 readScalar(phase1.lookup("Cp"))
+    );
+
+	dimensionedScalar cp2
+    (
+		 "Cp",
+		 dimensionSet(0,2,-2,-1,0,0,0),
+		 readScalar(phase2.lookup("Cp"))
+    );
+
+	dimensionedScalar Tsat
+    (
+		 "Tsat",
+		 dimTemperature,
+		 readScalar(pcProperties.lookup("Tsat"))
+    );
+
+	dimensionedScalar hlv
+    (
+		 "hlv",
+		 dimensionSet(0,2,-2,0,0,0,0),
+		 readScalar(pcProperties.lookup("hlv"))
+    );
+
+	dimensionedScalar diff
+    (
+		 "diff",
+		 dimensionSet(0,2,0,0,0,0,0),
+		 readScalar(pcProperties.lookup("diff"))
+    );
+
+	// Store cached values for use in setRegionFluidFields.H
+	k1Fluid.set(i, new dimensionedScalar(k1));
+	k2Fluid.set(i, new dimensionedScalar(k2));
+	cp1Fluid.set(i, new dimensionedScalar(cp1));
+	cp2Fluid.set(i, new dimensionedScalar(cp2));
+	TsatFluid.set(i, new dimensionedScalar(Tsat));
+	hlvFluid.set(i, new dimensionedScalar(hlv));
+	diffFluid.set(i, new dimensionedScalar(diff));
 
 	Info<< "    Adding to kappaFluid\n" << endl;
 	kappaFluid.set

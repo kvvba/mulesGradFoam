@@ -74,56 +74,14 @@ fv::options& fvOptions = fluidFvOptions[i];
 const label pRefCell = pRefCellFluid[i];
 const scalar pRefValue = pRefValueFluid[i];
 
-dictionary phase1 = mixture.subDict(mixture.phase1Name());
-dictionary phase2 = mixture.subDict(mixture.phase2Name());
-dictionary pcProperties = mixture.subDict("PhaseChangeProperties");
-
-const dimensionedScalar k1
-(
-    "kappa",
-    dimensionSet(1,1,-3,-1,0,0,0),
-    readScalar(phase1.lookup("kappa"))
-);
-const dimensionedScalar cp1
-(
-    "Cp",
-    dimensionSet(0,2,-2,-1,0,0,0),
-    readScalar(phase1.lookup("Cp"))
-);
-
-const dimensionedScalar k2
-(
-    "kappa",
-    dimensionSet(1,1,-3,-1,0,0,0),
-    readScalar(phase2.lookup("kappa"))
-);
-const dimensionedScalar cp2
-(
-    "Cp",
-    dimensionSet(0,2,-2,-1,0,0,0),
-    readScalar(phase2.lookup("Cp"))
-);
-
-const dimensionedScalar Tsat
-(
-    "Tsat",
-    dimTemperature,
-    readScalar(pcProperties.lookup("Tsat"))
-);
-
-const dimensionedScalar hlv
-(
-    "hlv",
-    dimensionSet(0,2,-2,0,0,0,0),
-    readScalar(pcProperties.lookup("hlv"))
-);
-
-const dimensionedScalar diff
-(
- "diff",
- dimensionSet(0,2,0,0,0,0,0),
- readScalar(pcProperties.lookup("diff"))
- );
+// Use cached phase properties instead of repeated dictionary lookups
+const dimensionedScalar& k1 = k1Fluid[i];
+const dimensionedScalar& k2 = k2Fluid[i];
+const dimensionedScalar& cp1 = cp1Fluid[i];
+const dimensionedScalar& cp2 = cp2Fluid[i];
+const dimensionedScalar& Tsat = TsatFluid[i];
+const dimensionedScalar& hlv = hlvFluid[i];
+const dimensionedScalar& diff = diffFluid[i];
 
 // Mass flux
 surfaceScalarField rhoPhi
@@ -300,3 +258,156 @@ volScalarField SArea
  mesh,
  dimensionedScalar(dimless/dimLength, Zero)
  );
+// --- Bubble seeding: read optional `constant/bubbleSeeding` dictionary once
+//     and seed a spherical vapour region when the local temperature reaches
+//     `activationTemperature`.
+//
+// Dictionary (optional, place in `constant/bubbleSeeding`):
+// {
+//     activationTemperature 373.15;    // scalar
+//     coordinate (0.01 0.02 0.0);      // vector (contact point on surface)
+//     surfaceNormal (0 0 1);          // vector (points into fluid)
+//     contactAngle 60;                // degrees
+//     initialRadius 1e-3;             // meters
+//     seedOnce true;                  // optional (default true)
+// }
+static bool _bubbleSeedingInit = false;
+static bool _bubbleSeeded = false;
+static label _bubbleSeedCell = -1;
+static scalar _bubbleActivationT = GREAT; // very large default = disabled
+static vector _bubbleCoordinate = vector::zero;
+static vector _bubbleNormal = vector::zero;
+static scalar _bubbleContactAngleDeg = 90.0;
+static scalar _bubbleRadius = 0.0;
+static bool _bubbleSeedOnce = true;
+static autoPtr<meshSearch> _bubbleMeshSearch; // Cached spatial search structure
+
+if (!_bubbleSeedingInit)
+{
+    _bubbleSeedingInit = true;
+
+    IOobject bsHeader
+    (
+        "bubbleSeeding",
+        runTime.constant(),
+        runTime,
+        IOobject::READ_IF_PRESENT,
+        IOobject::NO_WRITE
+    );
+
+    // Use IOobject header check for presence, then construct dictionary from file
+    if (bsHeader.typeHeaderOk<IOdictionary>(true))
+    {
+        IOdictionary bsDict(bsHeader);
+
+        _bubbleActivationT = bsDict.getOrDefault<scalar>("activationTemperature", GREAT);
+        _bubbleCoordinate = bsDict.getOrDefault<vector>("coordinate", vector::zero);
+        _bubbleNormal = bsDict.getOrDefault<vector>("surfaceNormal", vector(0,0,1));
+        _bubbleContactAngleDeg = bsDict.getOrDefault<scalar>("contactAngle", 90.0);
+        _bubbleRadius = bsDict.getOrDefault<scalar>("initialRadius", 0.0);
+        _bubbleSeedOnce = bsDict.getOrDefault<bool>("seedOnce", true);
+
+        if (_bubbleRadius > 0 && _bubbleActivationT < GREAT)
+        {
+            // Use meshSearch for efficient spatial lookup of nearest cell.
+            // In parallel, only the owning processor returns a valid index.
+            if (!_bubbleMeshSearch.valid())
+            {
+                _bubbleMeshSearch.reset(new meshSearch(mesh));
+            }
+            
+            _bubbleSeedCell = _bubbleMeshSearch->findCell(_bubbleCoordinate);
+
+            // Check across all ranks whether ANY processor found the cell
+            label globalFound = returnReduce
+            (
+                (_bubbleSeedCell >= 0) ? label(1) : label(0),
+                maxOp<label>()
+            );
+
+            if (globalFound == 0)
+            {
+                Info<< "bubbleSeeding: could not find a mesh cell for coordinate "
+                    << _bubbleCoordinate << " on any processor, disabling seeding." << endl;
+                _bubbleActivationT = GREAT;
+            }
+            else
+            {
+                Info<< "bubbleSeeding: configured seed"
+                    << " (coord " << _bubbleCoordinate << ") with R=" << _bubbleRadius
+                    << " contactAngle=" << _bubbleContactAngleDeg << " deg"
+                    << " (cell local to rank "
+                    << (_bubbleSeedCell >= 0 ? Pstream::myProcNo() : -1)
+                    << ")" << endl;
+            }
+        }
+        else
+        {
+            Info<< "bubbleSeeding: dictionary present but incomplete (must provide activationTemperature and initialRadius). Ignoring." << endl;
+        }
+    }
+    else
+    {
+        // no bubbleSeeding dictionary — that's fine
+			Info << "No bubbleSeeding dictionary found in " << runTime.constant() << nl;
+    }
+}
+
+// Check trigger each timestep (only if configured and not yet seeded or seedOnce==false)
+if (_bubbleActivationT < GREAT && (!_bubbleSeeded || !_bubbleSeedOnce))
+{
+    // Sample temperature at the cached/nearest cell (only on the owning
+    // processor).  Then use returnReduce so that ALL processors agree on
+    // whether to seed — correctBoundaryConditions() is collective MPI.
+    scalar Tcell = -GREAT;  // default: not reached
+    if (_bubbleSeedCell >= 0)
+    {
+        Tcell = T.internalField()[_bubbleSeedCell];
+    }
+
+    // Collective decision: take the maximum across all ranks
+    scalar TcellGlobal = returnReduce(Tcell, maxOp<scalar>());
+
+    if (TcellGlobal >= _bubbleActivationT)
+    {
+        Info << "bubbleSeeding: activation temperature reached (T=" << TcellGlobal
+             << ") — inserting bubble" << endl;
+
+        // vapour is always represented by alpha1 == 0 (user-specified)
+        // compute spherical centre so the interface meets the wall at the
+        // supplied contact angle: centre = contactPoint + n * (R * sin(theta))
+        scalar theta = _bubbleContactAngleDeg * Foam::acos(scalar(-1.0)) / scalar(180.0);
+        vector nHat = (_bubbleNormal == vector::zero) ? vector(0,0,1) : _bubbleNormal / mag(_bubbleNormal);
+        vector sphereCentre = _bubbleCoordinate + nHat * (_bubbleRadius * Foam::sin(theta));
+
+        // set alpha fields and vapour temperature inside sphere
+        // — runs on ALL processors so each modifies its own local cells
+        const pointField& Cc = mesh.C();
+        forAll(Cc, ci)
+        {
+            if (mag(Cc[ci] - sphereCentre) <= _bubbleRadius)
+            {
+                // alpha1 == 0 => vapour, alpha2 == 1 => liquid complement
+                alpha1[ci] = 0.0;
+                alpha2[ci] = 1.0;
+
+                // set vapour temperature to saturation for seeded vapour cells
+                TV[ci] = TsatField[ci];
+
+                // keep mixture/diagnostic temperature consistent
+                T[ci] = TV[ci];
+            }
+        }
+
+        // mark seeded to avoid repeated insertion (unless seedOnce==false)
+        _bubbleSeeded = true;
+
+        // update boundary fields — collective MPI, now called by ALL ranks
+        alpha1.correctBoundaryConditions();
+        alpha2.correctBoundaryConditions();
+        TV.correctBoundaryConditions();
+        T.correctBoundaryConditions();
+        Info << "bubbleSeeding: bubble inserted (centre=" << sphereCentre
+             << ", R=" << _bubbleRadius << ")" << endl;
+    }
+}
