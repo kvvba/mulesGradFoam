@@ -271,16 +271,16 @@ volScalarField SArea
 //     initialRadius 1e-3;             // meters
 //     seedOnce true;                  // optional (default true)
 // }
-static bool _bubbleSeedingInit = false;
-static bool _bubbleSeeded = false;
-static label _bubbleSeedCell = -1;
-static scalar _bubbleActivationT = GREAT; // very large default = disabled
-static vector _bubbleCoordinate = vector::zero;
-static vector _bubbleNormal = vector::zero;
-static scalar _bubbleContactAngleDeg = 90.0;
-static scalar _bubbleRadius = 0.0;
-static bool _bubbleSeedOnce = true;
-static autoPtr<meshSearch> _bubbleMeshSearch; // Cached spatial search structure
+bool _bubbleSeedingInit = false;
+bool _bubbleSeeded = false;
+label _bubbleSeedCell = -1;
+scalar _bubbleActivationT = GREAT; // very large default = disabled
+vector _bubbleCoordinate = vector::zero;
+vector _bubbleNormal = vector::zero;
+scalar _bubbleContactAngleDeg = 90.0;
+scalar _bubbleRadius = 0.0;
+bool _bubbleSeedOnce = true;
+autoPtr<meshSearch> _bubbleMeshSearch; // Cached spatial search structure
 
 if (!_bubbleSeedingInit)
 {
@@ -290,7 +290,7 @@ if (!_bubbleSeedingInit)
     (
         "bubbleSeeding",
         runTime.constant(),
-        runTime,
+        fluidRegions[i],
         IOobject::READ_IF_PRESENT,
         IOobject::NO_WRITE
     );
@@ -349,7 +349,7 @@ if (!_bubbleSeedingInit)
     else
     {
         // no bubbleSeeding dictionary — that's fine
-			Info << "No bubbleSeeding dictionary found in " << runTime.constant() << nl;
+			Info << "No bubbleSeeding dictionary found" << endl;
     }
 }
 
